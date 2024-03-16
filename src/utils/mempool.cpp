@@ -3,14 +3,14 @@
 
 using json = nlohmann::json;
 
-String lastBlock(String str) {
-    Serial.printf("Dentro funcion\n");
-
+uint32_t getLastBlock(String str) {
     json j = json::parse(str);
 
-    auto lastBlock = j["blocks"].template get<std::vector<json>>().back();
+    return j[0]["height"].template get<int>();
+}
 
-    Serial.printf("Last block: %s\n", lastBlock.dump().c_str());
+int getBTCPrice(String str) {
+    json j = json::parse(str);
 
-    return "";
+    return j["USD"].template get<int>();
 }
