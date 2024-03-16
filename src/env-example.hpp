@@ -1,0 +1,9 @@
+#ifndef ENV_HPP
+#define ENV_HPP
+
+////////////////////////////////////////////////// WiFi credentials ///////////////////////////////////////////////////
+
+const char *ENV_SSID = "WIFI_SSID";
+const char *ENV_PASS = "WIFI_PASS";
+
+#endif
