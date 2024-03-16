@@ -1,16 +1,19 @@
-#include "TFT_eSPI.h" // Hardware-specific library
+#include "TFT_eSPI.h"
 #include "env.hpp"
 #include "utils/mempool.hpp"
 #include <Arduino.h>
 #include <HTTPClient.h>
-#include <SPI.h> // library for SPI communication
+#include <SPI.h>
 #include <WiFi.h>
 
 #define SERIALDEBUG
 
 /// Display ///
-TFT_eSPI display = TFT_eSPI();           // Invoke custom library
-TFT_eSprite spr = TFT_eSprite(&display); // Sprite
+/* If you use ESP32-Sx + external OLed to see pins to connect Oled go to
+ * .pio/libdeps/nodemcu-32s/TFT_eSPI/User_Setups/Setup25_TTGO_T_Display.h
+ */
+TFT_eSPI display = TFT_eSPI();
+TFT_eSprite spr = TFT_eSprite(&display);
 
 void setup(void) {
 #ifdef SERIALDEBUG
