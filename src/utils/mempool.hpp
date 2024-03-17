@@ -3,8 +3,8 @@
 
 #include <Arduino.h>
 
-uint32_t getLastBlock(String str);
+String getLastBlock(String str);
 
-int getBTCPrice(String str);
+String getBTCPrice(String str);
 
 #endif

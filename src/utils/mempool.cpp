@@ -1,16 +1,39 @@
 #include "mempool.hpp"
-#include "json.hpp"
 
-using json = nlohmann::json;
+String getBTCPrice(String str) {
+    int index = str.indexOf("\"USD\":");
 
-uint32_t getLastBlock(String str) {
-    json j = json::parse(str);
+    String price;
 
-    return j[0]["height"].template get<int>();
+    if (index == -1) {
+        return "";
+    } else {
+        index += 6;
+        int i = 0;
+        while (isDigit(str[index + i])) {
+            price += str[index + i];
+            i++;
+        }
+    }
+
+    return price;
 }
 
-int getBTCPrice(String str) {
-    json j = json::parse(str);
+String getLastBlock(String str) {
+    int index = str.indexOf("\"height\":");
 
-    return j["USD"].template get<int>();
+    String lastBlock;
+
+    if (index == -1) {
+        return "";
+    } else {
+        index += 9;
+        int i = 0;
+        while (isDigit(str[index + i])) {
+            lastBlock += str[index + i];
+            i++;
+        }
+    }
+
+    return lastBlock;
 }
