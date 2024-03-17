@@ -12,8 +12,10 @@
 /* If you use ESP32-Sx + external OLed to see pins to connect Oled go to
  * .pio/libdeps/nodemcu-32s/TFT_eSPI/User_Setups/Setup25_TTGO_T_Display.h
  */
-TFT_eSPI display = TFT_eSPI();
-TFT_eSprite spr = TFT_eSprite(&display);
+TFT_eSPI tft = TFT_eSPI();
+TFT_eSprite display = TFT_eSprite(&tft);
+
+uint8_t lineWidth = 4;
 
 void setup(void) {
 #ifdef SERIALDEBUG
@@ -36,37 +38,50 @@ void setup(void) {
     Serial.printf("\nConnected to the WiFi network\n");
 #endif
 
-    spr.init();
-    spr.setRotation(0);
-    spr.createSprite(spr.width(), spr.height());
+    tft.init();
+    tft.setRotation(0);
+    tft.fillScreen(TFT_BLUE);
+    delay(2500);
+    display.deleteSprite();
+    display.createSprite(tft.width(), tft.height());
 
-    spr.fillScreen(TFT_BLACK);
-    spr.drawRect(0, 0, spr.width(), spr.height(), TFT_GREEN);
+    display.fillSprite(TFT_BLACK);
+    display.fillRect(0, 0, display.width(), lineWidth, TFT_GREEN);                            // Top
+    display.fillRect(0, display.height() - lineWidth, display.width(), lineWidth, TFT_GREEN); // Bottom
+    display.fillRect(0, 0, lineWidth, display.height(), TFT_GREEN);                           // Left
+    display.fillRect(display.width() - lineWidth, 0, lineWidth, display.height(), TFT_GREEN); // Right
 
-    // Set "cursor" at top left corner of display (0,0) and select font 4
-    spr.setCursor(0, 4, 4);
+    display.setTextColor(TFT_WHITE);
+    display.drawString("Initialised", lineWidth * 2, 32, 4);
+    display.drawString("White text", lineWidth * 2, 64, 4);
 
-    // Set the font colour to be white with a black background
-    spr.setTextColor(TFT_WHITE);
+    display.setTextColor(TFT_RED);
+    display.drawString("Red text", lineWidth * 2, 96, 4);
 
-    // We can now plot text on screen using the "print" class
-    spr.println(" Initialised default\n");
-    spr.println(" White text");
+    display.setTextColor(TFT_GREEN);
+    display.drawString("Green text", lineWidth * 2, 128, 4);
 
-    spr.setTextColor(TFT_RED);
-    spr.println(" Red text");
+    display.setTextColor(TFT_BLUE);
+    display.drawString("Blue text", lineWidth * 2, 160, 4);
 
-    spr.setTextColor(TFT_GREEN);
-    spr.println(" Green text");
+    display.pushSprite(0, 0);
 
-    spr.setTextColor(TFT_BLUE);
-    spr.println(" Blue text");
+    delay(5000);
 
-    delay(1000);
+    display.deleteSprite();
+    display.createSprite(tft.width() - lineWidth * 2, tft.height() - lineWidth * 2);
+    display.fillSprite(TFT_WHITE);
+    display.setTextColor(TFT_BLACK);
+    display.drawString("To setup", 4, 32, 4);
+    display.pushSprite(lineWidth, lineWidth);
 }
 
 HTTPClient httpClient;
-int httpCode;
+uint16_t httpCode;
+
+String lastBlock;
+String price;
+String aux;
 
 void loop() {
 #ifdef SERIALDEBUG
@@ -107,22 +122,26 @@ void loop() {
 
     httpClient.end(); // Close connection
 
-    spr.fillScreen(TFT_BLACK);
-    spr.drawRect(0, 0, spr.width(), spr.height(), TFT_GREEN);
+    display.deleteSprite();
+    display.createSprite(tft.width() - lineWidth * 2, tft.height() - lineWidth * 2);
+    display.fillSprite(TFT_BLACK);
 
-    spr.setTextColor(TFT_ORANGE);
-    spr.setCursor(16, 16, 4);
-    spr.printf("BITCOIN\n");
+    display.setTextColor(TFT_ORANGE);
+    display.drawString("BITCOIN", 4, 4, 4);
 
-    spr.setTextColor(TFT_WHITE);
-    spr.printf("\n Last block:\n");
-    spr.setTextColor(TFT_ORANGE);
-    spr.printf(" %d\n", getLastBlock(httpPayloadBlock));
+    display.setTextColor(TFT_WHITE);
+    display.drawString("Last block:", 4, 32, 4);
+    display.setTextColor(TFT_ORANGE);
+    lastBlock = (aux = getLastBlock(httpPayloadBlock)) ? aux : lastBlock;
+    display.drawString(lastBlock, 4, 64, 4);
 
-    spr.setTextColor(TFT_WHITE);
-    spr.printf("\n BTC price:\n");
-    spr.setTextColor(TFT_ORANGE);
-    spr.printf(" $%d", getBTCPrice(httpPayloadPrice));
+    display.setTextColor(TFT_WHITE);
+    display.drawString("Price:", 4, 96, 4);
+    display.setTextColor(TFT_ORANGE);
+    String price = (aux = getBTCPrice(httpPayloadPrice)) ? "$" + aux : price;
+    display.drawString(price, 4, 128, 4);
+
+    display.pushSprite(lineWidth, lineWidth);
 
     delay(5000);
 }
