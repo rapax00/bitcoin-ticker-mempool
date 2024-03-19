@@ -1,17 +1,25 @@
 #include "mempool.hpp"
 
+#define SERIALDEBUG
+
 String getBTCPrice(String str) {
-    int index = str.indexOf("\"USD\":");
+    int index = str.indexOf("\"price\":"); //"price": "67618.73",
 
     String price;
 
     if (index == -1) {
         return "";
     } else {
-        index += 6;
+        index += 9;
         int i = 0;
-        while (isDigit(str[index + i])) {
-            price += str[index + i];
+        while (true) {
+            if (isDigit(str[index + i])) {
+                price += str[index + i];
+            } else if (str[index + i] == '.') {
+                price += ",";
+            } else {
+                break;
+            }
             i++;
         }
     }
@@ -20,7 +28,8 @@ String getBTCPrice(String str) {
 }
 
 String getLastBlock(String str) {
-    int index = str.indexOf("\"height\":");
+    std::string cStr = str.c_str();
+    int index = cStr.rfind("\"height\":");
 
     String lastBlock;
 
