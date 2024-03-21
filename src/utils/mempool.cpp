@@ -29,14 +29,14 @@ String getBTCPrice(String str) {
 
 String getLastBlock(String str) {
     std::string cStr = str.c_str();
-    int index = cStr.rfind("\"height\":");
+    int index = cStr.rfind("\"lastBlock\":"); //"lastBlock": "835302",
 
     String lastBlock;
 
     if (index == -1) {
         return "";
     } else {
-        index += 9;
+        index += 13;
         int i = 0;
         while (isDigit(str[index + i])) {
             lastBlock += str[index + i];
