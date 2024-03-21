@@ -7,8 +7,6 @@
 #include <WiFi.h>
 
 #define SERIALDEBUG
-#define WS_MEMPOOL
-#define WS_COINBASE
 
 /// Display ///
 /* If you use ESP32-Sx + external OLed to see pins to connect Oled go to
@@ -23,23 +21,11 @@ uint8_t lineWidth = 4;
 TaskHandle_t webSocketsHandle;
 void taskWebSocketsHandle(void *vpParameters);
 
-/// Mempool
-#ifdef WS_MEMPOOL
-String wsMempoolMsg;
-bool newMempoolMsg = false;
-WebSocketsClient webSocketMempoolClient; // declare instance of websocket
+String wsMsg;
+bool newMsg = false;
+WebSocketsClient webSocketClient; // declare instance of websocket
 
-void webSocketMempoolEvent(WStype_t type, uint8_t *strload, size_t length);
-#endif
-
-/// Coinbase
-#ifdef WS_COINBASE
-String wsCoinbaseMsg;
-bool newCoinbaseMsg = false;
-WebSocketsClient webSocketCoinbaseClient; // declare instance of websocket
-
-void webSocketCoinbaseEvent(WStype_t type, uint8_t *strload, size_t length);
-#endif
+void webSocketEvent(WStype_t type, uint8_t *strload, size_t length);
 
 void setup(void) {
 #ifdef SERIALDEBUG
@@ -62,17 +48,10 @@ void setup(void) {
     Serial.printf("\nConnected to the WiFi network\n");
 #endif
 
-/// Init WebSockets ///
-#ifdef WS_MEMPOOL
-    webSocketMempoolClient.beginSSL("mempool.space", 443, "/api/v1/ws");
-    webSocketMempoolClient.onEvent(webSocketMempoolEvent);
-    webSocketMempoolClient.setReconnectInterval(1000);
-#endif
-#ifdef WS_COINBASE
-    webSocketCoinbaseClient.beginSSL("ws-feed.exchange.coinbase.com", 443);
-    webSocketCoinbaseClient.onEvent(webSocketCoinbaseEvent);
-    webSocketCoinbaseClient.setReconnectInterval(1000);
-#endif
+    /// Init WebSockets ///
+    webSocketClient.begin(ENV_WS_SERVER, 8080);
+    webSocketClient.onEvent(webSocketEvent);
+    webSocketClient.setReconnectInterval(1000);
 
     xTaskCreatePinnedToCore(taskWebSocketsHandle, "Web Sockets Handle", 10000, NULL, 0, &webSocketsHandle, 0);
 
@@ -118,26 +97,14 @@ String lastBlock = "";
 String price = "";
 String auxLastBlock = "";
 String auxPrice = "";
-bool newMsgs = false;
+bool pusheado = false;
 
 void loop() {
 #ifdef SERIALDEBUG
     // Serial.printf("Looping...\n");
 #endif
 
-#ifndef WS_MEMPOOL
-    newMsgs = newCoinbaseMsg;
-#endif
-#ifndef WS_COINBASE
-    newMsgs = newMempoolMsg;
-#endif
-#ifdef WS_MEMPOOL
-#ifdef WS_COINBASE
-    newMsgs = newMempoolMsg || newCoinbaseMsg;
-#endif
-#endif
-
-    if (newMsgs) {
+    if (newMsg) {
         Serial.printf("Loop running on core %d\n", xPortGetCoreID());
 
         display.deleteSprite();
@@ -147,31 +114,37 @@ void loop() {
         display.setTextColor(TFT_ORANGE);
         display.drawString("BITCOIN", 4, 4, 4);
 
-#ifdef WS_MEMPOOL
         display.setTextColor(TFT_WHITE);
         display.drawString("Last block:", 4, 32, 4);
         display.setTextColor(TFT_ORANGE);
-        lastBlock = newMempoolMsg && (auxLastBlock = getLastBlock(wsMempoolMsg)).isEmpty() ? auxLastBlock : lastBlock;
+        lastBlock = newMsg && !((auxLastBlock = getLastBlock(wsMsg)).isEmpty()) ? auxLastBlock : lastBlock;
 #ifdef SERIALDEBUG
         Serial.printf("=> lastBlock: %s\n", lastBlock.c_str());
 #endif
         display.drawString(lastBlock, 4, 64, 4);
-        newMempoolMsg = false;
-#endif
 
-#ifdef WS_COINBASE
         display.setTextColor(TFT_WHITE);
         display.drawString("Price:", 4, 96, 4);
         display.setTextColor(TFT_ORANGE);
-        price = newCoinbaseMsg && (auxPrice = getBTCPrice(wsCoinbaseMsg)).isEmpty() ? "$" + auxPrice : price;
+        price = newMsg && !((auxPrice = getBTCPrice(wsMsg)).isEmpty()) ? "$" + auxPrice : price;
 #ifdef SERIALDEBUG
         Serial.printf("=> price: %s\n", price.c_str());
 #endif
         display.drawString(price, 4, 128, 4);
-        newCoinbaseMsg = false;
-#endif
+        newMsg = false;
 
         display.pushSprite(lineWidth, lineWidth);
+        pusheado = false;
+    } else if (!pusheado) {
+        uint8_t limit = 12;
+        for (int i = 0; i < limit; i++) {
+            display.deleteSprite();
+            display.createSprite(((tft.width() - lineWidth * 2) / limit) * i, 8);
+            display.fillSprite(TFT_RED);
+            display.pushSprite(lineWidth, tft.height() - lineWidth - 8);
+            delay(500);
+        }
+        pusheado = true;
     }
 }
 
@@ -179,9 +152,7 @@ void loop() {
 /*                                       WebSocket                                               */
 /*************************************************************************************************/
 
-/// Mempool
-#ifdef WS_MEMPOOL
-void webSocketMempoolEvent(WStype_t type, uint8_t *strload, size_t length) {
+void webSocketEvent(WStype_t type, uint8_t *strload, size_t length) {
     switch (type) {
     case WStype_DISCONNECTED:
 #ifdef SERIALDEBUG
@@ -192,15 +163,14 @@ void webSocketMempoolEvent(WStype_t type, uint8_t *strload, size_t length) {
 #ifdef SERIALDEBUG
         Serial.printf("[WS Mempool] Connected\n");
 #endif
-        webSocketMempoolClient.sendTXT(
-            "{\"action\":\"want\",\"data\":[\"blocks\"]}"); // send message to server when connected
+        webSocketClient.sendTXT("{\"action\":\"want\"}"); // send message to server when connected
         break;
     case WStype_TEXT:
 #ifdef SERIALDEBUG
         Serial.printf("[WS Mempool] Received data from socket\n");
 #endif
-        wsMempoolMsg = (char *)strload;
-        newMempoolMsg = true;
+        wsMsg = (char *)strload;
+        newMsg = true;
         break;
     case WStype_ERROR:
     case WStype_FRAGMENT_TEXT_START:
@@ -213,52 +183,11 @@ void webSocketMempoolEvent(WStype_t type, uint8_t *strload, size_t length) {
 
 void taskWebSocketsHandle(void *vpParameters) {
 #ifdef SERIALDEBUG
-    Serial.printf("Start Task WebSocket Mempool Handle\n");
+    Serial.printf("Start Task WebSocket Handle\n");
     Serial.printf("taskWebSocketsHandle running on core %d\n", xPortGetCoreID());
 #endif
 
     for (;;) {
-#ifdef WS_MEMPOOL
-        webSocketMempoolClient.loop();
-#endif
-#ifdef WS_COINBASE
-        webSocketCoinbaseClient.loop();
-#endif
+        webSocketClient.loop();
     }
 }
-#endif
-
-/// Coinbase
-#ifdef WS_COINBASE
-void webSocketCoinbaseEvent(WStype_t type, uint8_t *strload, size_t length) {
-    switch (type) {
-    case WStype_DISCONNECTED:
-#ifdef SERIALDEBUG
-        Serial.printf("[WS Coinbase] Disconnected!\n");
-#endif
-        break;
-    case WStype_CONNECTED:
-#ifdef SERIALDEBUG
-        Serial.printf("[WS Coinbase] Connected\n");
-#endif
-        webSocketCoinbaseClient.sendTXT(
-            "{\"type\":\"subscribe\",\"product_ids\":[\"BTC-USD\"],\"channels\":[\"ticker_batch\"]}"); // send message
-                                                                                                       // to server when
-                                                                                                       // connected
-        break;
-    case WStype_TEXT:
-#ifdef SERIALDEBUG
-        Serial.printf("[WS Coinbase] Received data from socket\n");
-#endif
-        wsCoinbaseMsg = (char *)strload;
-        newCoinbaseMsg = true;
-        break;
-    case WStype_ERROR:
-    case WStype_FRAGMENT_TEXT_START:
-    case WStype_FRAGMENT_BIN_START:
-    case WStype_FRAGMENT:
-    case WStype_FRAGMENT_FIN:
-        break;
-    }
-}
-#endif
